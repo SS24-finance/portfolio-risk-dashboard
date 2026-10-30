@@ -208,7 +208,17 @@ html(f"""
 html("""
 <div class="fl-note"><i>i</i><span>This dashboard is an educational tool. It does not provide investment recommendations.</span></div>
 """)
+def load_beginner_example():
+    """Fill the inputs with a fixed educational example."""
+    st.session_state["ticker_input"] = "AAPL, MSFT"
+    st.session_state["start_date"] = date(2025, 1, 1)
+    st.session_state["end_date"] = date(2026, 1, 1)
 
+    st.session_state["weight_AAPL"] = 50.0
+    st.session_state["weight_MSFT"] = 50.0
+
+    st.session_state.previous_tickers = ["AAPL", "MSFT"]
+    st.session_state.saved_allocations = [50.0, 50.0]
 # Remember allocations when ticker symbols change
 if "previous_tickers" not in st.session_state:
     st.session_state.previous_tickers = []
@@ -219,6 +229,11 @@ if "saved_allocations" not in st.session_state:
 # ---------------------------------------------------------------------------
 # Portfolio inputs (main page)
 # ---------------------------------------------------------------------------
+st.button(
+    "📚 Load Beginner Example — AAPL 50% / MSFT 50%",
+    on_click=load_beginner_example,
+    help="Loads a hypothetical two-stock portfolio for learning."
+)
 with st.container():
     card_head("Build your portfolio",
               "Enter 2–10 tickers, set weights that total 100%, then choose a date range. "
@@ -227,14 +242,24 @@ with st.container():
     col_tickers, col_start, col_end = st.columns([2, 1, 1])
     with col_tickers:
         ticker_input = st.text_input(
-            "Stock Tickers", value="AAPL, NKE, DIS",
-            help="Enter 2–10 stock symbols separated by commas."
-        )
+    "Stock Tickers",
+    value="AAPL, NKE, DIS",
+    key="ticker_input",
+    help="Enter 2–10 stock symbols separated by commas."
+)
         tickers = [ticker.strip().upper() for ticker in ticker_input.split(",") if ticker.strip()]
     with col_start:
-        start_date = st.date_input("Start Date", value=date(2025, 1, 1))
+       start_date = st.date_input(
+    "Start Date",
+    value=date(2025, 1, 1),
+    key="start_date"
+)
     with col_end:
-        end_date = st.date_input("End Date", value=date(2026, 1, 1))
+        end_date = st.date_input(
+    "End Date",
+    value=date(2026, 1, 1),
+    key="end_date"
+)
 
     sub_head("Portfolio Allocations", "Set each stock's weight so the total equals 100%.")
 
@@ -363,8 +388,14 @@ if analyze_button and valid_inputs:
                                   help="Historical sensitivity to S&P 500 daily movements.")
                         st.metric("Sharpe Ratio", f"{results['Sharpe Ratio']:.3f}",
                                   help="Historical risk-adjusted return using an illustrative 4% annual risk-free rate.")
-                        st.metric("Maximum Drawdown", f"{results['Maximum Drawdown']:.2%}",
-                                  help="Largest historical decline from a previous peak.")
+                        st.metric(
+                            "Maximum Drawdown",
+                            f"{results['Maximum Drawdown']:.2%}",
+                            help=(
+                                "The largest percentage decline from a previous "
+                                "portfolio peak during the selected historical period."
+                            )
+                        )
                         st.metric("S&P 500 Difference", f"{results['Benchmark Difference'] * 100:+.2f} pp",
                                   help="Difference in cumulative returns, in percentage points.")
 
@@ -374,8 +405,19 @@ if analyze_button and valid_inputs:
                         st.write("**Annualized Volatility:** Historical return variability, scaled to a year.")
                         st.write("**Beta:** Historical sensitivity to S&P 500 daily movements.")
                         st.write("**Sharpe Ratio:** Historical risk-adjusted return using an illustrative 4% annual risk-free rate.")
-                        st.write("**Maximum Drawdown:** Largest historical decline from a previous peak.")
-                        st.write("**S&P 500 Difference:** Difference in cumulative returns, in percentage points.")
+st.write(
+    "**Maximum Drawdown (MDD):** The biggest percentage drop "
+    "your portfolio experienced from a previous high point "
+    "during the selected period."
+)
+
+st.info(
+    "💡 **Example:** Imagine your portfolio grows to $100, "
+    "then falls to $70 before recovering. "
+    "Its maximum drawdown is −30%. "
+    "This helps you understand how severe a historical decline "
+    "could have felt, even if the portfolio eventually recovered."
+)                        st.write("**S&P 500 Difference:** Difference in cumulative returns, in percentage points.")
 
                     # Chart data (same calculations as before)
                     portfolio_returns = results["Portfolio Daily Returns"]
@@ -390,7 +432,94 @@ if analyze_button and valid_inputs:
                         pd.Series([100.0], index=[close_prices.index[0]]),
                         market_growth
                     ])
+section("Charts", "Interactive charts: hover to see exact values.")
+# Calculate benchmark maximum drawdown for comparison.
+# Start at 1.0 to include the initial portfolio value.
+benchmark_growth = (1 + market_returns).cumprod()
 
+benchmark_growth = pd.concat([
+    pd.Series([1.0], index=[close_prices.index[0]]),
+    benchmark_growth
+])
+
+benchmark_running_peak = benchmark_growth.cummax()
+
+benchmark_drawdown = (
+    benchmark_growth / benchmark_running_peak - 1
+)
+
+benchmark_mdd = benchmark_drawdown.min()
+st.markdown("### Understanding Maximum Drawdown")
+
+mdd_col1, mdd_col2 = st.columns(2)
+
+with mdd_col1:
+    st.metric(
+        "Your Portfolio's Maximum Drawdown",
+        f"{results['Maximum Drawdown']:.2%}"
+    )
+
+with mdd_col2:
+    st.metric(
+        "S&P 500 Maximum Drawdown",
+        f"{benchmark_mdd:.2%}"
+    )
+
+st.caption(
+    "Both drawdowns are calculated over the same available "
+    "historical trading dates. More negative values indicate "
+    "a larger peak-to-trough decline."
+)
+
+st.info(
+    "📘 **Try explaining this:** Which experienced a larger "
+    "historical decline — your portfolio or the S&P 500? "
+    "How much larger was that decline?"
+)
+section(
+    "Analysis Assumptions",
+    "Understand the settings and limitations behind these results."
+)
+
+with st.expander("View portfolio assumptions", expanded=True):
+
+    allocation_text = ", ".join(
+        f"{ticker}: {weight:.1f}%"
+        for ticker, weight in weights.items()
+    )
+
+    st.write(f"**Selected date range:** {start_date} to {end_date}")
+
+    st.write(
+        "**Available market data:** "
+        f"{close_prices.index[0].date()} to "
+        f"{close_prices.index[-1].date()}"
+    )
+
+    st.write(f"**Portfolio allocations:** {allocation_text}")
+
+    st.write("**Rebalancing:** Daily to target weights")
+
+    st.write("**Risk-free rate:** 4% annually (illustrative)")
+
+    st.write("**Annualization:** 252 trading days per year")
+
+    st.write("**Transaction costs and taxes:** Not included")
+
+    st.write(
+        "**Dividend treatment:** Stock prices are downloaded "
+        "with auto_adjust=True, so historical stock returns "
+        "reflect Yahoo Finance's adjustments for dividends "
+        "and splits. The S&P 500 benchmark (^GSPC) is a "
+        "price index rather than a total-return index. "
+        "This means dividend treatment is not identical "
+        "between the portfolio and benchmark."
+    )
+
+    st.caption(
+        "Historical performance is not a prediction of "
+        "future investment results."
+    )
                     section("Charts", "Interactive charts: hover to see exact values.")
                     top_left, top_right = st.columns([2, 1])
                     bottom_left, bottom_right = st.columns(2)
