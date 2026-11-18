@@ -211,7 +211,7 @@ st.markdown("<style>" + "\n".join(l for l in CSS.splitlines() if l.strip()) + "<
 # ---------------------------------------------------------------------------
 html(f"""
 <div class="fl-hero">
-<span class="fl-badge"><span class="fl-logo"></span>FINANCE LAB | BY: SIMRAN SUTARIA | 2026</span><span class="fl-byline"></span><h1>Portfolio Risk Dashboard</h1>
+<span class="fl-badge"><span class="fl-logo"></span>FINANCE LAB | BY: SS | 2026</span><span class="fl-byline"></span><h1>Portfolio Risk Dashboard</h1>
 <p>Explore historical portfolio performance, risk, and diversification using real market data.</p>
 </div>
 """)
